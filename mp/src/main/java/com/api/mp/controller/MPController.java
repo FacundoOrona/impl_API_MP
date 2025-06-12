@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.api.mp.entities.ProductoRequestDTO;
+import com.api.mp.entities.WebhookDTO;
 import com.api.mp.service.MPService;
 
 @RestController
@@ -25,6 +26,16 @@ public class MPController {
             return ResponseEntity.ok(initPoint);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error al crear preferencia: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/webhook")
+    public ResponseEntity<String> recibirWebhook(@RequestBody WebhookDTO webhook) {
+        try {
+            mpService.procesarWebhook(webhook);
+            return ResponseEntity.ok("Webhook procesado correctamente");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error al procesar el webhook: " + e.getMessage());
         }
     }
     
