@@ -77,7 +77,6 @@ public class MPService {
                         System.out.println("Webhook ignorado: tipo no soportado " + webhook.getType());
                         return;
                 }
-
                 try {
                         // Obtengo el ID de pago
                         String paymentId = webhook.getData().getId();
