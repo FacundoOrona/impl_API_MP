@@ -1,5 +1,6 @@
 package com.api.mp.service;
 
+import java.time.LocalDateTime;
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.preference.PreferenceClient;
@@ -35,6 +36,14 @@ public class MPService {
                 // Se busca el producto recibido
                 Producto producto = productoRepository.findById(Long.valueOf(p.getId()))
                                 .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+                
+                if(producto.isVendido() || producto.isReservado()){
+                        throw new RuntimeException("El producto ya fue vendido o reservado");
+                }
+
+                producto.setReservado(true);
+                producto.setFecha_reserva(LocalDateTime.now());
+                productoRepository.save(producto);
 
                 // Inicializa config
                 MercadoPagoConfig.setAccessToken(accessToken);
@@ -90,6 +99,22 @@ public class MPService {
 
                         // Obtengo el ID del la transaccion para cambiuarte el estado
                         String externalReference = payment.getExternalReference();
+
+                        Transaccion tr = transaccionRepository.findById(Long.parseLong(externalReference))
+                                .orElseThrow(() -> new RuntimeException(
+                                                "Transacción no encontrada: ID " + externalReference));
+
+                        Producto pr = productoRepository.findById(tr.getProducto().getId())
+                                .orElseThrow(() -> new RuntimeException("Producto no encontrado: ID "
+                                                + tr.getProducto().getId()));
+
+                        if(pr.isVendido()) {
+                                System.out.println("El producto ya fue vendido, no se puede cambiar");
+                                return;
+                        }
+
+                        pr.setVendido(true);
+                        productoRepository.save(pr);
 
                         if (externalReference == null) {
                                 System.out.println("No se encontró externalReference (transactionId)");
