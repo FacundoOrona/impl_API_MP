@@ -1,5 +1,7 @@
 package com.api.mp.entities;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -20,4 +22,10 @@ public class Producto {
     private String nombre;
 
     private Double precio;
+
+    private boolean reservado;
+
+    private LocalDateTime fecha_reserva;
+
+    private boolean vendido;
 }
