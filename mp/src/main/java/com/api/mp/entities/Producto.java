@@ -28,4 +28,8 @@ public class Producto {
     private LocalDateTime fecha_reserva;
 
     private boolean vendido;
+
+    public Boolean estaDisponible(){
+        return !vendido && !reservado;
+    }
 }
