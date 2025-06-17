@@ -25,7 +25,7 @@ public class OauthController {
     @GetMapping("/callback")
     public ResponseEntity<String> callback(@RequestParam("code") String code,
             @RequestParam("state") String state) {
-        String resultado = oauthService.obtenerAccessToken(code, state);
+        String resultado = oauthService.obtenerAccesToken(code, state);
         return ResponseEntity.ok(resultado);
     }
 }
