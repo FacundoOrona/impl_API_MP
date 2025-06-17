@@ -52,4 +52,51 @@ public class OauthService {
         StateOauth entity = new StateOauth(idUsuario, state);
         stateRepository.save(entity);
     }
+
+    public String obtenerAccesToken(String code, String state) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("grant_type", "authorization_code");
+        body.add("client_id", clientId);
+        body.add("client_secret", clientSecret);
+        body.add("code", code);
+        body.add("redirect_uri", redirectUrl);
+
+         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<OauthTokenRequestDTO> response = restTemplate.postForEntity(
+                "https://api.mercadopago.com/oauth/token",
+                request,
+                OauthTokenRequestDTO.class);
+
+        guardarToken(response.getBody(), obtenerUsuario(state));
+        
+        return response.toString();
+    }
+
+    private Usuario obtenerUsuario(String state) {
+        StateOauth stateOauth = stateRepository.findByState(state)
+                .orElseThrow(() -> new RuntimeException("state no encontrado"));
+
+        Usuario usuario = usuarioRepository.findById(stateOauth.getUsuarioId())
+                .orElseThrow(() -> new RuntimeException("usuario no encontrado"));
+        return usuario;
+    }
+
+    public void guardarToken(OauthTokenRequestDTO oauthTokenDTO, Usuario usuario) {
+        OauthToken token = new OauthToken();
+        token.setAccessToken(oauthTokenDTO.getAccessToken());
+        token.setRefreshToken(oauthTokenDTO.getRefreshToken());
+        token.setPublicKey(oauthTokenDTO.getPublicKey());
+        token.setUserId(oauthTokenDTO.getUserId());
+        token.setLiveMode(oauthTokenDTO.isLiveMode());
+        token.setExpiresAt(LocalDateTime.now().plusSeconds(oauthTokenDTO.getExpiresIn()));
+        token.setUsuario(usuario);
+        
+        oauthRepository.save(token);
+    }
+
 }
