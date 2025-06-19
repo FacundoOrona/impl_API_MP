@@ -10,5 +10,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ProductoRequestDTO {
     @NotNull(message = "El ID no puede estar vacio o nulo")
-    int id;
+    Long id;
 }
