@@ -18,8 +18,14 @@ import com.api.mp.repository.*;
 @Service
 public class MPService {
 
-        @Value("${mercadopago.access-token}")
-        String accessToken;
+        // @Value("${mercadopago.access-token}")
+        // String accessToken;
+        
+        @Value("${clientId}")
+        String clientId;
+
+        @Value("${clientSecret}")
+        String clientSecret;
 
         private final ProductoRepository productoRepository;
         private final TransaccionRepository transaccionRepository;
@@ -36,8 +42,8 @@ public class MPService {
                 // Se busca el producto recibido
                 Producto producto = productoRepository.findById(Long.valueOf(p.getId()))
                                 .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
-                
-                if(producto.isVendido() || producto.isReservado()){
+
+                if (producto.isVendido() || producto.isReservado()) {
                         throw new RuntimeException("El producto ya fue vendido o reservado");
                 }
 
@@ -101,14 +107,14 @@ public class MPService {
                         String externalReference = payment.getExternalReference();
 
                         Transaccion tr = transaccionRepository.findById(Long.parseLong(externalReference))
-                                .orElseThrow(() -> new RuntimeException(
-                                                "Transacción no encontrada: ID " + externalReference));
+                                        .orElseThrow(() -> new RuntimeException(
+                                                        "Transacción no encontrada: ID " + externalReference));
 
                         Producto pr = productoRepository.findById(tr.getProducto().getId())
-                                .orElseThrow(() -> new RuntimeException("Producto no encontrado: ID "
-                                                + tr.getProducto().getId()));
+                                        .orElseThrow(() -> new RuntimeException("Producto no encontrado: ID "
+                                                        + tr.getProducto().getId()));
 
-                        if(pr.isVendido()) {
+                        if (pr.isVendido()) {
                                 System.out.println("El producto ya fue vendido, no se puede cambiar");
                                 return;
                         }
