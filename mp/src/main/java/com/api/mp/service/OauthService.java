@@ -69,7 +69,7 @@ public class OauthService {
                 request,
                 OauthTokenRequestDTO.class);
 
-        guardarToken(response.getBody(), obtenerUsuario(state));
+        guardarToken(response.getBody(), usuarioService.obtenerUsuarioPorState(state));
 
         return response.toString();
     }
