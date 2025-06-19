@@ -50,11 +50,6 @@ public class OauthService {
                 "&state=" + state;
     }
 
-    private void guardarStateOauth(Long idUsuario, String state) {
-        StateOauth entity = new StateOauth(idUsuario, state);
-        stateRepository.save(entity);
-    }
-
     public String obtenerAccesToken(String code, String state) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
