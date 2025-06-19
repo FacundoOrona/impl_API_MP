@@ -87,4 +87,10 @@ public class OauthService {
         oauthRepository.save(token);
     }
 
+    public String obtenerAccessTokenPorId(Long id) {
+        return oauthRepository.findByUsuarioId(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado por ID"))
+                .getAccessToken();
+    }
+
 }
