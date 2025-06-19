@@ -74,15 +74,6 @@ public class OauthService {
         return response.toString();
     }
 
-    private Usuario obtenerUsuario(String state) {
-        StateOauth stateOauth = stateRepository.findByState(state)
-                .orElseThrow(() -> new RuntimeException("state no encontrado"));
-
-        Usuario usuario = usuarioRepository.findById(stateOauth.getUsuarioId())
-                .orElseThrow(() -> new RuntimeException("usuario no encontrado"));
-        return usuario;
-    }
-
     public void guardarToken(OauthTokenRequestDTO oauthTokenDTO, Usuario usuario) {
         OauthToken token = new OauthToken();
         token.setAccessToken(oauthTokenDTO.getAccessToken());
