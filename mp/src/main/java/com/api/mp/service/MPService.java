@@ -20,7 +20,7 @@ public class MPService {
 
         // @Value("${mercadopago.access-token}")
         // String accessToken;
-        
+
         @Value("${clientId}")
         String clientId;
 
@@ -30,12 +30,14 @@ public class MPService {
         private final ProductoRepository productoRepository;
         private final TransaccionRepository transaccionRepository;
         private final UsuarioRepository usuarioRepository;
+        private final OauthService oauthService;
 
-        public MPService(ProductoRepository p, TransaccionRepository t,
-                        UsuarioRepository u) {
-                this.productoRepository = p;
-                this.transaccionRepository = t;
-                this.usuarioRepository = u;
+        public MPService(ProductoRepository p, TransaccionRepository t, UsuarioRepository u,
+        OauthService oauthService) {
+        this.productoRepository = p;
+        this.transaccionRepository = t;
+        this.usuarioRepository = u;
+        this.oauthService = oauthService;
         }
 
         public String crearPreferencia(ProductoRequestDTO p) throws Exception {
