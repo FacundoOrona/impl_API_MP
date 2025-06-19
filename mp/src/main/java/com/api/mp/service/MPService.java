@@ -1,6 +1,8 @@
 package com.api.mp.service;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.preference.PreferenceClient;
@@ -33,25 +35,27 @@ public class MPService {
         private final OauthService oauthService;
 
         public MPService(ProductoRepository p, TransaccionRepository t, UsuarioRepository u,
-        OauthService oauthService) {
-        this.productoRepository = p;
-        this.transaccionRepository = t;
-        this.usuarioRepository = u;
-        this.oauthService = oauthService;
+                        OauthService oauthService) {
+                this.productoRepository = p;
+                this.transaccionRepository = t;
+                this.usuarioRepository = u;
+                this.oauthService = oauthService;
         }
 
         public String crearPreferencia(ProductoRequestDTO p) throws Exception {
                 // Se busca el producto recibido
-                Producto producto = productoRepository.findById(Long.valueOf(p.getId()))
+                Producto producto = productoRepository.findById(p.getId())
                                 .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
 
-                if (producto.isVendido() || producto.isReservado()) {
-                        throw new RuntimeException("El producto ya fue vendido o reservado");
+                if (!producto.estaDisponible()) {
+                        throw new RuntimeException("Producto vendido o reservado");
                 }
 
-                producto.setReservado(true);
-                producto.setFecha_reserva(LocalDateTime.now());
-                productoRepository.save(producto);
+                String accessToken = oauthService.obtenerAccessTokenPorId(1L);
+
+                if (!oauthService.AccessTokenValido(accessToken)) {
+                        throw new RuntimeException("Access token vencido o revocado por el vendedor");
+                }
 
                 // Inicializa config
                 MercadoPagoConfig.setAccessToken(accessToken);
@@ -73,13 +77,29 @@ public class MPService {
                 Transaccion transaccion = new Transaccion("Pendiente", usuarioComprador, producto);
                 Transaccion transaccionSave = transaccionRepository.save(transaccion);
 
+                // Tiempo actual
+                OffsetDateTime now = OffsetDateTime.now();
+
+                // Tiempo de expiración: 2 minutos desde ahora
+                OffsetDateTime expirationFrom = now;
+                OffsetDateTime expirationTo = now.plusMinutes(2);
+
                 // Arma la preferencia
                 PreferenceRequest preferenceRequest = PreferenceRequest.builder()
                                 .items(List.of(item))
-                                .externalReference(transaccionSave.getId().toString()) // Aca se manda el id de la
-                                                                                       // transaccion para obtenerlo
-                                                                                       // cuando se haga el pago
+                                // Aca se manda el id de la transaccion para obtenerlo cuando se haga el pago
+                                .externalReference(transaccionSave.getId().toString())
+                                // Aca se setean datos para que la URL expire y no sea comprada mas alla de lo
+                                // que dura la reserva
+                                .expires(true)
+                                .expirationDateFrom(expirationFrom)
+                                .expirationDateTo(expirationTo)
                                 .build();
+
+                // Se marca el producto como reservado
+                producto.setReservado(true);
+                producto.setFecha_reserva(LocalDateTime.now());
+                productoRepository.save(producto);
 
                 // Se termina la preferencia
                 PreferenceClient client = new PreferenceClient();
