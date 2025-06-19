@@ -27,21 +27,23 @@ public class OauthService {
     @Value("${clientSecret}")
     String clientSecret;
 
-    private final StateOauthRepository stateRepository;
-    private final UsuarioRepository usuarioRepository;
+    private final UsuarioService usuarioService;
     private final OauthTokenRepository oauthRepository;
+    private final StateOauthService stateOauthService;
 
-    public OauthService(StateOauthRepository stateRepository, ProductoRepository productoRepository,
-            UsuarioRepository usuarioRepository, OauthTokenRepository oauthRepository) {
-        this.stateRepository = stateRepository;
-        this.usuarioRepository = usuarioRepository;
+    public OauthService(UsuarioService usuarioService, OauthTokenRepository oauthRepository,
+            StateOauthService stateOauthService) {
+        this.usuarioService = usuarioService;
         this.oauthRepository = oauthRepository;
-    }
+        this.stateOauthService = stateOauthService;
+    }    
 
     public String UrlAutorizacion() {
-        Long idUsuarioLogueado = new Long(1); // obtiene el id del usuaio autenticado
-        String state = UUID.randomUUID().toString(); //guarda state del usuario
-        guardarStateOauth(idUsuarioLogueado, state);
+        Long idUsuarioLogueado = usuarioService.obtenerUsuariosPorId(1L) 
+            .orElseThrow(() -> new RuntimeException("Usuario no encontrado con el ID"))
+            .getId();  // obtiene el id del usuaio autenticado
+        String state = UUID.randomUUID().toString(); // guarda state del usuario
+        stateOauthService.guardarStateOauth(idUsuarioLogueado, state);
         return "https://auth.mercadopago.com.ar/authorization?response_type=code" +
                 "&client_id=" + clientId +
                 "&redirect_uri=" + redirectUrl +
@@ -64,7 +66,7 @@ public class OauthService {
         body.add("code", code);
         body.add("redirect_uri", redirectUrl);
 
-         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
         RestTemplate restTemplate = new RestTemplate();
         ResponseEntity<OauthTokenRequestDTO> response = restTemplate.postForEntity(
@@ -73,7 +75,7 @@ public class OauthService {
                 OauthTokenRequestDTO.class);
 
         guardarToken(response.getBody(), obtenerUsuario(state));
-        
+
         return response.toString();
     }
 
@@ -95,7 +97,7 @@ public class OauthService {
         token.setLiveMode(oauthTokenDTO.isLiveMode());
         token.setExpiresAt(LocalDateTime.now().plusSeconds(oauthTokenDTO.getExpiresIn()));
         token.setUsuario(usuario);
-        
+
         oauthRepository.save(token);
     }
 
