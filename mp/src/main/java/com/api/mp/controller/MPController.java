@@ -33,9 +33,11 @@ public class MPController {
     public ResponseEntity<String> recibirWebhook(@RequestBody WebhookDTO webhook) {
         try {
             mpService.procesarWebhook(webhook);
-            return ResponseEntity.ok("Webhook procesado correctamente");
+            return ResponseEntity.ok("Webhook procesado");
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error al procesar el webhook: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError()
+                    .body("Error procesando webhook: " + e.getMessage());
         }
     }
     
