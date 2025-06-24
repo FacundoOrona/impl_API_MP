@@ -57,8 +57,9 @@ public class OauthService {
                 "&state=" + state;
     }
 
-    public String obtenerAccesToken(String code, String state) {
-        HttpHeaders headers = new HttpHeaders();
+    public void obtenerAccesToken(String code, String state) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
@@ -76,9 +77,17 @@ public class OauthService {
                 request,
                 OauthTokenRequestDTO.class);
 
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                throw new RuntimeException("Error al obtener el token de Mercado Pago");
+        }
+
         guardarTokenNuevo(response.getBody(), usuarioService.obtenerUsuarioPorState(state));
 
-        return response.toString();
+        } catch (HttpClientErrorException e) {
+            throw new RuntimeException("Error de cliente: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+        } catch (Exception e) {
+            throw new RuntimeException("Error al obtener token: " + e.getMessage());
+        }
     }
 
     public void guardarTokenNuevo(OauthTokenRequestDTO oauthTokenDTO, Usuario usuario) {
@@ -94,7 +103,7 @@ public class OauthService {
         oauthRepository.save(token);
     }
 
-    public void actualizarToken(OauthTokenRequestDTO oauthTokenDTO, Usuarios usuario) {
+    public void actualizarToken(OauthTokenRequestDTO oauthTokenDTO, Usuario usuario) {
         OauthToken token = oauthRepository.findByUsuarioId(usuario.getId())
                 .orElseThrow(() -> new RuntimeException("Error al obtener token para guardar nuevo"));
         token.setAccessToken(encriptadoUtil.encriptar(oauthTokenDTO.getAccessToken()));
