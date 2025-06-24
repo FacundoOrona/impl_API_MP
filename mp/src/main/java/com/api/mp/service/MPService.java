@@ -24,9 +24,10 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.MultiValueMap;
-
+import com.api.mp.exceptions.TokenRevocadoException;
 import com.api.mp.entities.*;
 import com.api.mp.repository.*;
+import com.api.mp.util.EncriptadoUtil;
 
 @Service
 public class MPService {
@@ -44,13 +45,15 @@ public class MPService {
         private final TransaccionRepository transaccionRepository;
         private final UsuarioRepository usuarioRepository;
         private final OauthService oauthService;
+        private final EncriptadoUtil encriptadoUtil;
 
         public MPService(ProductoRepository p, TransaccionRepository t, UsuarioRepository u,
-                        OauthService oauthService) {
+                        OauthService oauthService, EncriptadoUtil e) {
                 this.productoRepository = p;
                 this.transaccionRepository = t;
                 this.usuarioRepository = u;
                 this.oauthService = oauthService;
+                this.encriptadoUtil = e;
         }
 
         public String crearPreferencia(ProductoRequestDTO p) throws Exception {
@@ -62,7 +65,8 @@ public class MPService {
                         throw new RuntimeException("Producto vendido o reservado");
                 }
 
-                String accessToken = oauthService.obtenerAccessTokenPorId(1L);
+                String accessTokenEncriptado = oauthService.obtenerAccessTokenPorId(1L);
+                String accessToken = encriptadoUtil.desencriptar(accessTokenEncriptado);
 
                 if (!oauthService.AccessTokenValido(accessToken)) {
                         throw new RuntimeException("Access token vencido o revocado por el vendedor");
@@ -139,33 +143,38 @@ public class MPService {
                         // Obtengo el ID del la transaccion para cambiuarte el estado
                         String externalReference = payment.getExternalReference();
 
-                        Transaccion tr = transaccionRepository.findById(Long.parseLong(externalReference))
-                                        .orElseThrow(() -> new RuntimeException(
-                                                        "Transacción no encontrada: ID " + externalReference));
-
-                        Producto pr = productoRepository.findById(tr.getProducto().getId())
-                                        .orElseThrow(() -> new RuntimeException("Producto no encontrado: ID "
-                                                        + tr.getProducto().getId()));
-
-                        if (pr.isVendido()) {
-                                System.out.println("El producto ya fue vendido, no se puede cambiar");
-                                return;
-                        }
-
-                        pr.setVendido(true);
-                        productoRepository.save(pr);
-
-                        if (externalReference == null) {
-                                System.out.println("No se encontró externalReference (transactionId)");
-                                return;
-                        }
-                        // Se castea a Long se va a buscar la transaccion y se le seteaa el nuevo estado
                         Long transactionId = Long.parseLong(externalReference);
                         Transaccion transaccion = transaccionRepository.findById(transactionId)
                                         .orElseThrow(() -> new RuntimeException(
                                                         "Transacción no encontrada: ID " + transactionId));
-                        transaccion.setEstado(estado);
-                        transaccionRepository.save(transaccion);
+
+                        // Obtengo el producto de la transaccion
+                        Producto producto = transaccion.getProducto();
+
+                        // Obtengo el accessToken del vendedor por si hay que rembolsar
+                        String accessTokenEncriptado = oauthService.obtenerAccessTokenPorId(1L);
+                        String accessToken = encriptadoUtil.desencriptar(accessTokenEncriptado);
+
+                        if (externalReference == null) {
+                                System.out.println("No se encontró externalReference (transactionId)");
+                                reembolsarPago(paymentId, accessToken);
+                                return;
+                        }
+
+                        if (producto.getVendido()) { //isVendido si es boolean con b minus
+                                // en caso que se haya venido se reembolsa
+                                System.out.println("Producto ya no está disponible, haciendo reembolso...");
+                                reembolsarPago(paymentId, accessToken);
+                                transaccion.setEstado("reembolsado");
+                                return;
+                        }
+
+                        if ("approved".equalsIgnoreCase(estado)) {
+                                producto.setVendido(true);
+                                transaccion.setEstado("Pago");
+                                productoRepository.save(producto);
+                                transaccionRepository.save(transaccion);
+                        }
                 } catch (Exception e) {
                         System.out.println("Error al procesar webhook: " + e.getMessage());
                 }
@@ -190,30 +199,32 @@ public class MPService {
         }
 
         public OauthTokenRequestDTO refrescarToken(String refreshToken) {
-        try {
-            RestTemplate restTemplate = new RestTemplate();
+                try {
+                        RestTemplate restTemplate = new RestTemplate();
 
-            String url = "https://api.mercadopago.com/oauth/token";
+                        String url = "https://api.mercadopago.com/oauth/token";
 
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("grant_type", "refresh_token");
-            body.add("client_id", clientId);
-            body.add("client_secret", clientSecret);
-            body.add("refresh_token", refreshToken);
+                        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+                        body.add("grant_type", "refresh_token");
+                        body.add("client_id", clientId);
+                        body.add("client_secret", clientSecret);
+                        body.add("refresh_token", refreshToken);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+                        HttpHeaders headers = new HttpHeaders();
+                        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+                        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
-            ResponseEntity<OauthTokenRequestDTO> response = restTemplate.postForEntity(url, request, OauthTokenRequestDTO.class);
+                        ResponseEntity<OauthTokenRequestDTO> response = restTemplate.postForEntity(url, request,
+                                        OauthTokenRequestDTO.class);
 
-            return response.getBody();
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() == HttpStatus.BAD_REQUEST || e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                throw new TokenRevocadoException("El refresh token fue revocado o no es válido");
-            }
-            throw e;
+                        return response.getBody();
+                } catch (HttpClientErrorException e) {
+                        if (e.getStatusCode() == HttpStatus.BAD_REQUEST
+                                        || e.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                                throw new TokenRevocadoException("El refresh token fue revocado o no es válido");
+                        }
+                        throw e;
+                }
         }
-    }
 }
