@@ -57,7 +57,7 @@ public class OauthService {
                 "&state=" + state;
     }
 
-    public void obtenerAccesToken(String code, String state) {
+    public void obtenerAccessToken(String code, String state) {
         try {
             HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
