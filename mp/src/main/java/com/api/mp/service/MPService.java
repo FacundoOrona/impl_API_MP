@@ -8,7 +8,9 @@ import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
+import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.resources.payment.Payment;
+import com.mercadopago.resources.payment.PaymentRefund;
 import com.mercadopago.resources.preference.Preference;
 import java.math.BigDecimal;
 import java.util.List;
@@ -157,6 +159,24 @@ public class MPService {
                         transaccionRepository.save(transaccion);
                 } catch (Exception e) {
                         System.out.println("Error al procesar webhook: " + e.getMessage());
+                }
+        }
+
+        private void reembolsarPago(String paymentId, String accessToken) {
+                try {
+                        MercadoPagoConfig.setAccessToken(accessToken);
+                        // Obtener el pago con PaymentClient
+                        PaymentClient client = new PaymentClient();
+                        Payment payment = client.get(Long.parseLong(paymentId));
+                        // Ejecutar el reembolso
+                        PaymentRefund refundPayment = client.refund(payment.getId());
+
+                        System.out.println("Reembolso exitoso: " + refundPayment.getId());
+
+                } catch (MPApiException e) {
+                        System.out.println("Error MercadoPago: " + e.getApiResponse().getContent());
+                } catch (Exception e) {
+                        System.out.println("Error inesperado: " + e.getMessage());
                 }
         }
 }
