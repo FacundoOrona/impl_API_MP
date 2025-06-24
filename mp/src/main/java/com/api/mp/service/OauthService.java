@@ -1,5 +1,6 @@
 package com.api.mp.service;
 
+import java.util.List;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.api.mp.entities.*;
 import com.api.mp.repository.*;
+import com.api.mp.util.*;
 
 @Service
 public class OauthService {
@@ -33,12 +35,14 @@ public class OauthService {
     private final UsuarioService usuarioService;
     private final OauthTokenRepository oauthRepository;
     private final StateOauthService stateOauthService;
+    private final EncriptadoUtil encriptadoUtil;
 
     public OauthService(UsuarioService usuarioService, OauthTokenRepository oauthRepository,
-            StateOauthService stateOauthService) {
+            StateOauthService stateOauthService, EncriptadoUtil encriptadoUtil) {
         this.usuarioService = usuarioService;
         this.oauthRepository = oauthRepository;
         this.stateOauthService = stateOauthService;
+        this.encriptadoUtil = encriptadoUtil;
     }    
 
     public String UrlAutorizacion() {
@@ -72,16 +76,30 @@ public class OauthService {
                 request,
                 OauthTokenRequestDTO.class);
 
-        guardarToken(response.getBody(), usuarioService.obtenerUsuarioPorState(state));
+        guardarTokenNuevo(response.getBody(), usuarioService.obtenerUsuarioPorState(state));
 
         return response.toString();
     }
 
-    public void guardarToken(OauthTokenRequestDTO oauthTokenDTO, Usuario usuario) {
+    public void guardarTokenNuevo(OauthTokenRequestDTO oauthTokenDTO, Usuario usuario) {
         OauthToken token = new OauthToken();
         token.setAccessToken(oauthTokenDTO.getAccessToken());
         token.setRefreshToken(oauthTokenDTO.getRefreshToken());
         token.setPublicKey(oauthTokenDTO.getPublicKey());
+        token.setUserId(oauthTokenDTO.getUserId());
+        token.setLiveMode(oauthTokenDTO.isLiveMode());
+        token.setExpiresAt(LocalDateTime.now().plusSeconds(oauthTokenDTO.getExpiresIn()));
+        token.setUsuario(usuario);
+
+        oauthRepository.save(token);
+    }
+
+    public void actualizarToken(OauthTokenRequestDTO oauthTokenDTO, Usuarios usuario) {
+        OauthToken token = oauthRepository.findByUsuarioId(usuario.getId())
+                .orElseThrow(() -> new RuntimeException("Error al obtener token para guardar nuevo"));
+        token.setAccessToken(encriptadoUtil.encriptar(oauthTokenDTO.getAccessToken()));
+        token.setRefreshToken(encriptadoUtil.encriptar(oauthTokenDTO.getRefreshToken()));
+        token.setPublicKey(encriptadoUtil.encriptar(oauthTokenDTO.getPublicKey()));
         token.setUserId(oauthTokenDTO.getUserId());
         token.setLiveMode(oauthTokenDTO.isLiveMode());
         token.setExpiresAt(LocalDateTime.now().plusSeconds(oauthTokenDTO.getExpiresIn()));
@@ -114,6 +132,10 @@ public class OauthService {
             }
             return false;
         }
+    }
+
+    public List<OauthToken> obtenerTokenDeUsuariosVendedores() {
+        return oauthRepository.findByUsuario_VendedorTrue();
     }
 
 }
