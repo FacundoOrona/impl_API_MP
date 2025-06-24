@@ -22,4 +22,6 @@ public class Usuario {
 
     @Column(unique = true)
     private String email;
+
+    private boolean vendedor;
 }
